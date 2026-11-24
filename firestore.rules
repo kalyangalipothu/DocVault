@@ -1,0 +1,267 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Shared Security Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isBoundedStringList(arr, maxLen) {
+      return arr is list && arr.size() <= maxLen && (arr.size() == 0 || arr[0] is string);
+    }
+
+    // --- Entity Validation Blueprints ---
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.displayName is string && data.displayName.size() <= 120 &&
+             data.email is string && data.email.size() <= 254 &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             data.e2eeEnabled is bool &&
+             (!('e2eeSalt' in data) || data.e2eeSalt == null || (data.e2eeSalt is string && data.e2eeSalt.size() <= 128)) &&
+             (!('e2eeVerifier' in data) || data.e2eeVerifier == null || (data.e2eeVerifier is string && data.e2eeVerifier.size() <= 512)) &&
+             data.storageUsedBytes is int && data.storageUsedBytes >= 0 && data.storageUsedBytes <= 10737418240 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidVaultFolder(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.colorHex is string && data.colorHex.size() >= 4 && data.colorHex.size() <= 16 &&
+             data.iconName is string && data.iconName.size() >= 1 && data.iconName.size() <= 40 &&
+             data.privateVault is bool &&
+             isBoundedStringList(data.tags, 20) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidVaultDocument(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 255 &&
+             data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 120 &&
+             data.fileCategory is string && data.fileCategory in ['IMAGE', 'PDF', 'DOCX', 'ARCHIVE', 'TEXT', 'OTHER'] &&
+             data.fileSizeBytes is int && data.fileSizeBytes >= 0 && data.fileSizeBytes <= 524288000 &&
+             data.uploadDateMillis is int && data.uploadDateMillis > 0 &&
+             (!('folderId' in data) || data.folderId == null || (data.folderId is string && data.folderId.size() <= 128)) &&
+             data.aiCategory is string && data.aiCategory.size() <= 80 &&
+             isBoundedStringList(data.tags, 25) &&
+             data.extractedText is string && data.extractedText.size() <= 100000 &&
+             data.summary is string && data.summary.size() <= 2000 &&
+             data.thumbnailBase64 is string && data.thumbnailBase64.size() <= 150000 &&
+             data.hasCloudBlob is bool &&
+             data.encrypted is bool &&
+             data.encryptedPayload is string && data.encryptedPayload.size() <= 250000 &&
+             data.encryptionIv is string && data.encryptionIv.size() <= 64 &&
+             data.ocrStatus is string && data.ocrStatus in ['PENDING', 'COMPLETED', 'FAILED', 'ENCRYPTED'] &&
+             data.pageCount is int && data.pageCount >= 0 && data.pageCount <= 2000 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidDocumentBlob(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.docId is string && isValidId(data.docId) &&
+             data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 120 &&
+             data.dataBase64 is string && data.dataBase64.size() <= 900000 &&
+             data.encrypted is bool &&
+             data.encryptionIv is string && data.encryptionIv.size() <= 64 &&
+             data.byteLength is int && data.byteLength >= 0 && data.byteLength <= 900000 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSavedWebsite(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.urlTemplate is string && data.urlTemplate.size() >= 8 && data.urlTemplate.size() <= 500 &&
+             data.urlTemplate.matches('^https?://.*$') &&
+             data.category is string && data.category.size() <= 50 &&
+             data.usageCount is int && data.usageCount >= 0 && data.usageCount <= 1000000 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSearchHistoryEntry(data) {
+      return data.userId is string && data.userId == request.auth.uid &&
+             data.query is string && data.query.size() >= 1 && data.query.size() <= 500 &&
+             data.mode is string && data.mode in ['SEARCH', 'AI_ASK', 'WEB_LOOKUP'] &&
+             data.aiAnswerPreview is string && data.aiAnswerPreview.size() <= 2000 &&
+             data.resultCount is int && data.resultCount >= 0 && data.resultCount <= 100000 &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'email', 'e2eeEnabled', 'storageUsedBytes', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'e2eeEnabled', 'e2eeSalt', 'e2eeVerifier', 'storageUsedBytes', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt && (
+                         incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'updatedAt']) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['e2eeEnabled', 'e2eeSalt', 'e2eeVerifier', 'updatedAt']) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly(['storageUsedBytes', 'updatedAt'])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // Custom & E2EE Private Folders
+      match /folders/{folderId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(folderId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(folderId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'colorHex', 'iconName', 'privateVault', 'tags', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'colorHex', 'iconName', 'privateVault', 'tags', 'createdAt', 'updatedAt']) &&
+                         isValidVaultFolder(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(folderId) &&
+                         isValidVaultFolder(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'colorHex', 'iconName', 'privateVault', 'tags', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(folderId);
+      }
+
+      // Searchable Document Metadata & OCR Index
+      match /documents/{docId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(docId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(docId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'title', 'fileName', 'mimeType', 'fileCategory', 'fileSizeBytes',
+                           'uploadDateMillis', 'aiCategory', 'tags', 'extractedText', 'summary',
+                           'thumbnailBase64', 'hasCloudBlob', 'encrypted', 'encryptedPayload',
+                           'encryptionIv', 'ocrStatus', 'pageCount', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'title', 'fileName', 'mimeType', 'fileCategory', 'fileSizeBytes',
+                           'uploadDateMillis', 'folderId', 'aiCategory', 'tags', 'extractedText', 'summary',
+                           'thumbnailBase64', 'hasCloudBlob', 'encrypted', 'encryptedPayload',
+                           'encryptionIv', 'ocrStatus', 'pageCount', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidVaultDocument(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(docId) &&
+                         isValidVaultDocument(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt && (
+                           // Action: Edit upload date
+                           incoming().diff(existing()).affectedKeys().hasOnly(['uploadDateMillis', 'updatedAt']) ||
+                           // Action: Edit metadata, folder, tags, AI category, or OCR results
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'title', 'uploadDateMillis', 'folderId', 'aiCategory', 'tags',
+                             'extractedText', 'summary', 'thumbnailBase64', 'hasCloudBlob',
+                             'encrypted', 'encryptedPayload', 'encryptionIv', 'ocrStatus', 'pageCount', 'updatedAt'
+                           ])
+                         );
+
+        allow delete: if isOwner(userId) && isValidId(docId);
+      }
+
+      // Off-Device Cloud Storage Payloads
+      match /doc_blobs/{docId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(docId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(docId) &&
+                         incoming().docId == docId &&
+                         incoming().keys().hasAll(['userId', 'docId', 'mimeType', 'dataBase64', 'encrypted', 'encryptionIv', 'byteLength', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'docId', 'mimeType', 'dataBase64', 'encrypted', 'encryptionIv', 'byteLength', 'createdAt', 'updatedAt']) &&
+                         isValidDocumentBlob(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(docId) &&
+                         isValidDocumentBlob(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().docId == existing().docId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['mimeType', 'dataBase64', 'encrypted', 'encryptionIv', 'byteLength', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(docId);
+      }
+
+      // User Saved Lookup Websites (for highlighted OCR text lookup)
+      match /saved_websites/{siteId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(siteId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(siteId) &&
+                         incoming().keys().hasAll(['userId', 'name', 'urlTemplate', 'category', 'usageCount', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'name', 'urlTemplate', 'category', 'usageCount', 'createdAt', 'updatedAt']) &&
+                         isValidSavedWebsite(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(siteId) &&
+                         isValidSavedWebsite(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt && (
+                           incoming().diff(existing()).affectedKeys().hasOnly(['usageCount', 'updatedAt']) ||
+                           incoming().diff(existing()).affectedKeys().hasOnly(['name', 'urlTemplate', 'category', 'usageCount', 'updatedAt'])
+                         );
+
+        allow delete: if isOwner(userId) && isValidId(siteId);
+      }
+
+      // Synced Search & AI Assistant History
+      match /search_history/{historyId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(historyId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(historyId) &&
+                         incoming().keys().hasAll(['userId', 'query', 'mode', 'aiAnswerPreview', 'resultCount', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'query', 'mode', 'aiAnswerPreview', 'resultCount', 'createdAt']) &&
+                         isValidSearchHistoryEntry(incoming());
+
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(historyId);
+      }
+    }
+  }
+}

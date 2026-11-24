@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user's profile, off-device cloud storage meter, and end-to-end encryption vault metadata.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "displayName": { "type": "string", "description": "User display name." },
+        "email": { "type": "string", "description": "User Google account email." },
+        "photoUrl": { "type": "string", "description": "Optional avatar URL." },
+        "e2eeEnabled": { "type": "boolean", "description": "Whether E2EE private folder passphrase is set." },
+        "e2eeSalt": { "type": "string", "description": "Base64 PBKDF2 salt for E2EE key derivation." },
+        "e2eeVerifier": { "type": "string", "description": "AES-GCM encrypted verifier token to validate passphrase across devices." },
+        "storageUsedBytes": { "type": "integer", "description": "Total off-device cloud bytes stored across documents." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." }
+      },
+      "required": ["userId", "displayName", "email", "e2eeEnabled", "storageUsedBytes", "createdAt", "updatedAt"]
+    },
+    "VaultFolder": {
+      "title": "VaultFolder",
+      "description": "Custom document folder with tags and optional end-to-end encryption privacy flag.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "name": { "type": "string", "description": "Custom folder display name." },
+        "colorHex": { "type": "string", "description": "Accent hex color for the folder badge." },
+        "iconName": { "type": "string", "description": "Icon key identifier." },
+        "privateVault": { "type": "boolean", "description": "Whether files in this folder use client-side AES-256-GCM E2EE." },
+        "tags": { "type": "array", "description": "Bounded list of folder tags." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." }
+      },
+      "required": ["userId", "name", "colorHex", "iconName", "privateVault", "tags", "createdAt", "updatedAt"]
+    },
+    "VaultDocument": {
+      "title": "VaultDocument",
+      "description": "Lightweight searchable metadata, OCR extracted text, AI categorization, editable upload date, and E2EE ciphertext envelope for a stored document or photo.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "title": { "type": "string", "description": "Document display title (or masked placeholder when E2EE encrypted)." },
+        "fileName": { "type": "string", "description": "Original filename with extension." },
+        "mimeType": { "type": "string", "description": "MIME type of the uploaded file." },
+        "fileCategory": { "type": "string", "enum": ["IMAGE", "PDF", "DOCX", "ARCHIVE", "TEXT", "OTHER"], "description": "Normalized file format category." },
+        "fileSizeBytes": { "type": "integer", "description": "Original file size in bytes." },
+        "uploadDateMillis": { "type": "integer", "description": "Editable upload/filing date in epoch milliseconds." },
+        "folderId": { "type": "string", "description": "Optional parent VaultFolder document ID." },
+        "aiCategory": { "type": "string", "description": "Automated Gemini AI category label." },
+        "tags": { "type": "array", "description": "User and AI assigned searchable tags." },
+        "extractedText": { "type": "string", "description": "OCR / parsed text content (empty when encrypted)." },
+        "summary": { "type": "string", "description": "AI-generated document summary." },
+        "thumbnailBase64": { "type": "string", "description": "Compressed preview thumbnail (empty when encrypted)." },
+        "hasCloudBlob": { "type": "boolean", "description": "Whether an off-device file payload is stored in doc_blobs." },
+        "encrypted": { "type": "boolean", "description": "Whether sensitive content is E2EE encrypted." },
+        "encryptedPayload": { "type": "string", "description": "Base64 AES-256-GCM ciphertext JSON for E2EE metadata and OCR text." },
+        "encryptionIv": { "type": "string", "description": "Base64 12-byte GCM initialization vector." },
+        "ocrStatus": { "type": "string", "enum": ["PENDING", "COMPLETED", "FAILED", "ENCRYPTED"], "description": "Text recognition processing status." },
+        "pageCount": { "type": "integer", "description": "Page or archive entry count." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." }
+      },
+      "required": [
+        "userId", "title", "fileName", "mimeType", "fileCategory", "fileSizeBytes",
+        "uploadDateMillis", "aiCategory", "tags", "extractedText", "summary",
+        "thumbnailBase64", "hasCloudBlob", "encrypted", "encryptedPayload",
+        "encryptionIv", "ocrStatus", "pageCount", "createdAt", "updatedAt"
+      ]
+    },
+    "DocumentBlob": {
+      "title": "DocumentBlob",
+      "description": "Off-device cloud storage payload for a document photo or file, loaded lazily on detail view.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "docId": { "type": "string", "description": "Associated VaultDocument ID." },
+        "mimeType": { "type": "string", "description": "Stored blob MIME type." },
+        "dataBase64": { "type": "string", "description": "Base64 raw or AES-GCM encrypted file bytes." },
+        "encrypted": { "type": "boolean", "description": "Whether dataBase64 is E2EE encrypted." },
+        "encryptionIv": { "type": "string", "description": "Base64 GCM IV when encrypted." },
+        "byteLength": { "type": "integer", "description": "Size of stored cloud payload in bytes." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." }
+      },
+      "required": ["userId", "docId", "mimeType", "dataBase64", "encrypted", "encryptionIv", "byteLength", "createdAt", "updatedAt"]
+    },
+    "SavedWebsite": {
+      "title": "SavedWebsite",
+      "description": "User-saved website search template for direct lookup from highlighted OCR document text.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "name": { "type": "string", "description": "Friendly website label." },
+        "urlTemplate": { "type": "string", "description": "HTTP/HTTPS URL or search template with optional {query} placeholder." },
+        "category": { "type": "string", "description": "Website category such as Tracking, Finance, or Custom." },
+        "usageCount": { "type": "integer", "description": "Number of times launched from highlighted text." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." }
+      },
+      "required": ["userId", "name", "urlTemplate", "category", "usageCount", "createdAt", "updatedAt"]
+    },
+    "SearchHistoryEntry": {
+      "title": "SearchHistoryEntry",
+      "description": "Synced history of keyword searches, AI document Q&A prompts, and highlighted-text web lookups.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID." },
+        "query": { "type": "string", "description": "Search query, AI question, or highlighted lookup phrase." },
+        "mode": { "type": "string", "enum": ["SEARCH", "AI_ASK", "WEB_LOOKUP"], "description": "Interaction mode." },
+        "aiAnswerPreview": { "type": "string", "description": "Optional AI answer snippet or website name." },
+        "resultCount": { "type": "integer", "description": "Matched document count." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp (FieldValue.serverTimestamp())." }
+      },
+      "required": ["userId", "query", "mode", "aiAnswerPreview", "resultCount", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user profile, E2EE vault salt/verifier, and cloud storage usage."
+    },
+    "/users/{userId}/folders/{folderId}": {
+      "schema": { "$ref": "#/entities/VaultFolder" },
+      "description": "User's custom and E2EE private document folders."
+    },
+    "/users/{userId}/documents/{docId}": {
+      "schema": { "$ref": "#/entities/VaultDocument" },
+      "description": "User's searchable document index with OCR text, tags, AI categories, and editable upload date."
+    },
+    "/users/{userId}/doc_blobs/{docId}": {
+      "schema": { "$ref": "#/entities/DocumentBlob" },
+      "description": "User's off-device cloud storage payloads fetched lazily on open."
+    },
+    "/users/{userId}/saved_websites/{siteId}": {
+      "schema": { "$ref": "#/entities/SavedWebsite" },
+      "description": "User's saved lookup websites for direct highlighted-text search."
+    },
+    "/users/{userId}/search_history/{historyId}": {
+      "schema": { "$ref": "#/entities/SearchHistoryEntry" },
+      "description": "User's synced search bar and AI Q&A history."
+    }
+  }
+}

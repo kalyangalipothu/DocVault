@@ -1,0 +1,6 @@
+{
+  "name": "DocVault",
+  "description": "AI-powered encrypted document photo vault with OCR text recognition, instant search, custom folders, biometric lock, web lookup shortcuts, and cross-device cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
